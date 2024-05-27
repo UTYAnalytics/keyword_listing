@@ -511,7 +511,7 @@ def fetch_asin_tokeyword(asin):
             password="5giE*5Y5Uexi3P2",
             host="aws-0-us-west-1.pooler.supabase.com",
         )
-        cur = conn.cursor()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         # Execute a query
         cur.execute(
             """
@@ -532,7 +532,7 @@ def fetch_asin_tokeyword(asin):
         # Fetch all results
         results = cur.fetchall()
         # Extract the asin values from the results
-        asins = [item[0] for item in results]
+        asins = [item['asin'] for item in results]
         subset_size = 10
         subsets = [
             ", ".join(asins[i : i + subset_size])
