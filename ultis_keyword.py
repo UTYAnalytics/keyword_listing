@@ -60,7 +60,7 @@ with tempfile.TemporaryDirectory() as download_dir:
     options = [
         # Define window size here
         "--ignore-certificate-errors",
-        "--headless=new",
+        # "--headless=new",
         "--disable-gpu",
         "--no-sandbox",
         "--disable-dev-shm-usage",
@@ -68,6 +68,7 @@ with tempfile.TemporaryDirectory() as download_dir:
         "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36",
         "accept-language=en-US",
     ]
+    chrome_options.add_argument('--proxy-server=50.175.212.79:80')
     chrome_options.add_experimental_option("prefs", prefs)
 
     for option in options:
@@ -579,7 +580,7 @@ def fetch_asin_tokeyword(asin):
 def scrap_helium_asin_keyword(
     driver, asin, username="forheliumonly@gmail.com", password="qz6EvRm65L3HdjM2!!@#$"
 ):
-    connect_vpn("us-hou.prod.surfshark.comsurfshark_openvpn_tcp.ovpn")
+    # connect_vpn("/us-hou.prod.surfshark.comsurfshark_openvpn_tcp.ovpn")
     # Open Helium10
     driver.get("https://members.helium10.com/cerebro?accountId=1544526096")
     wait = WebDriverWait(driver, 30)
@@ -743,8 +744,8 @@ def scrap_helium_asin_keyword(
     except Exception as e:
         print(e)
         traceback.print_exc()
-    finally:
-        disconnect_vpn()
+    # finally:
+    #     disconnect_vpn()
 
 
 def main(asins):
