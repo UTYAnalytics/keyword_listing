@@ -1,5 +1,6 @@
 # Remember to close the browser
 import tempfile
+import psycopg2.extras
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
@@ -25,6 +26,7 @@ from multiprocessing import Pool
 from selenium.common.exceptions import TimeoutException
 import traceback
 import subprocess
+from psycopg2.extras import DictCursor
 
 SUPABASE_URL = "https://sxoqzllwkjfluhskqlfl.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4b3F6bGx3a2pmbHVoc2txbGZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDIyODE1MTcsImV4cCI6MjAxNzg1NzUxN30.FInynnvuqN8JeonrHa9pTXuQXMp9tE4LO0g5gj0adYE"
@@ -64,7 +66,9 @@ with tempfile.TemporaryDirectory() as download_dir:
     ]
 
     chrome_options.add_experimental_option("prefs", prefs)
-
+    chrome_options.add_extension(
+        dir_path + "/CapMonster-Cloud-—-automated-captcha-solver.crx"
+    )
     for option in options:
         chrome_options.add_argument(option)
 
@@ -101,6 +105,36 @@ def fetch_existing_relevant_asin(asin):
         if conn:
             conn.close()
 
+def fetch_existing_relevant_asin_main():
+    conn = None
+    try:
+        # Connect to your database
+        conn = psycopg2.connect(
+            dbname="postgres",
+            user="postgres.sxoqzllwkjfluhskqlfl",
+            password="5giE*5Y5Uexi3P2",
+            host="aws-0-us-west-1.pooler.supabase.com",
+        )
+        cur = conn.cursor()
+        # Execute a query
+        cur.execute(
+            "SELECT distinct asin_relevant FROM products_relevant_smartscounts a where a.sys_run_date = %s ",
+            (
+                str(current_time_gmt7.strftime("%Y-%m-%d")),
+            ),
+        )
+
+        # Fetch all results
+        asins = cur.fetchall()
+        # Convert list of tuples to list
+        asins = [item[0] for item in asins]
+        return asins
+    except Exception as e:
+        print(f"Database error: {e}")
+        return []
+    finally:
+        if conn:
+            conn.close()
 
 def format_header(header):
     # Convert to lowercase
@@ -144,6 +178,8 @@ def start_driver(asin):
         relevant_asins = fetch_existing_relevant_asin(asin)
         scrap_data_smartcount_product(driver, relevant_asins)
         time.sleep(5)
+        captcha_solver(driver)
+        time.sleep(2)
         scrap_helium_asin_keyword(driver, fetch_asin_tokeyword(asin))
     finally:
         driver.quit()
@@ -486,20 +522,20 @@ def scrap_data_smartcount_product(driver, asin):
         traceback.print_exc()
 
 
-def connect_vpn(config_file):
-    try:
-        subprocess.run(["openvpn", "--config", config_file], check=True)
-        print(f"Connected to VPN using {config_file}")
-    except subprocess.CalledProcessError as e:
-        print(f"Error connecting to VPN: {e}")
+# def connect_vpn(config_file):
+#     try:
+#         subprocess.run(["openvpn", "--config", config_file], check=True)
+#         print(f"Connected to VPN using {config_file}")
+#     except subprocess.CalledProcessError as e:
+#         print(f"Error connecting to VPN: {e}")
 
 
-def disconnect_vpn():
-    try:
-        subprocess.run(["pkill", "openvpn"], check=True)
-        print("Disconnected from VPN")
-    except subprocess.CalledProcessError as e:
-        print(f"Error disconnecting from VPN: {e}")
+# def disconnect_vpn():
+#     try:
+#         subprocess.run(["pkill", "openvpn"], check=True)
+#         print("Disconnected from VPN")
+#     except subprocess.CalledProcessError as e:
+#         print(f"Error disconnecting from VPN: {e}")
 
 
 def fetch_asin_tokeyword(asin):
@@ -549,6 +585,47 @@ def fetch_asin_tokeyword(asin):
             conn.close()
 
 
+def captcha_solver(driver, API="7f97e318653cc85d2d7bc5efdfb1ea9f"):
+    # Path to your extension .crx file
+    extension_path = "CapMonster-Cloud-—-automated-captcha-solver.crx"
+    extension_id = (
+        "pabjfbciaedomjjfelfafejkppknjleh"  # Replace with your actual extension ID
+    )
+
+    # Create a temporary Chrome user data directory
+    user_data_dir = os.path.join(os.getcwd(), "temp_user_data_dir")
+    os.makedirs(user_data_dir, exist_ok=True)
+    chrome_options.add_extension(extension_path)
+    chrome_options.add_argument(f"user-data-dir={user_data_dir}")
+    # Navigate to the extension's URL
+    extension_url = f"chrome-extension://{extension_id}/popup.html"  # Replace 'popup.html' with your extension's specific page if different
+    driver.get(extension_url)
+
+    # Interact with the extension's elements
+    try:
+        # Example: Input text into a text field
+        wait = WebDriverWait(driver, 10)
+        input_field = wait.until(
+            EC.visibility_of_element_located(
+                (By.CSS_SELECTOR, "input#client-key-input")
+            )
+        )
+
+        # Enter text into the input field
+        input_text = API
+        input_field.clear()
+        input_field.send_keys(input_text)
+
+        # Wait for the save button to be clickable, then click it
+        save_button = wait.until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, "button#client-key-save-btn"))
+        )
+        save_button.click()
+    except Exception as e:
+        # raise Exception
+        print("Error during captcha:", e)
+
+
 def scrap_helium_asin_keyword(
     driver, asin, username="forheliumonly@gmail.com", password="qz6EvRm65L3HdjM2!!@#$"
 ):
@@ -559,6 +636,7 @@ def scrap_helium_asin_keyword(
     print("login")
     # Login process
     try:
+
         # driver.get("https://members.helium10.com/cerebro?accountId=1544526096")
         username_field = wait.until(
             EC.visibility_of_element_located((By.ID, "loginform-email"))
@@ -566,8 +644,8 @@ def scrap_helium_asin_keyword(
         username_field.send_keys(username)
         password_field = driver.find_element(By.ID, "loginform-password")
         password_field.send_keys(password)
+        time.sleep(50)
         password_field.send_keys(Keys.RETURN)
-        time.sleep(2)
     except Exception as e:
         # raise Exception
         print("Error during login:", e)
@@ -729,7 +807,6 @@ def main(asins):
 if __name__ == "__main__":
     # Example list of ASINs input by the user
     user_asins = ["B07VPWR7YY"]
-    user_asins = [asin for asin in user_asins if not fetch_existing_relevant_asin(asin)]
+    user_asins = [asin for asin in user_asins if not fetch_existing_relevant_asin_main()]
     if user_asins:
         main(user_asins)
-    
