@@ -54,7 +54,7 @@ with tempfile.TemporaryDirectory() as download_dir:
     options = [
         # Define window size here
         "--ignore-certificate-errors",
-        # "--headless=new",
+        "--headless=new",
         "--disable-gpu",
         "--no-sandbox",
         "--disable-dev-shm-usage",
@@ -62,8 +62,7 @@ with tempfile.TemporaryDirectory() as download_dir:
         "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36",
         "accept-language=en-US",
     ]
-    # PROXY = "50.175.212.79:80"
-    # chrome_options.add_argument(f"--proxy-server={PROXY}")
+
     chrome_options.add_experimental_option("prefs", prefs)
 
     for option in options:
@@ -141,8 +140,10 @@ def start_driver(asin):
     try:
         smartscouts_next_login(driver, username, password)
         scrap_data_smartcount_relevant_product(driver, asin)
+        time.sleep(5)
         relevant_asins = fetch_existing_relevant_asin(asin)
         scrap_data_smartcount_product(driver, relevant_asins)
+        time.sleep(5)
         scrap_helium_asin_keyword(driver, fetch_asin_tokeyword(asin))
     finally:
         driver.quit()
@@ -183,7 +184,7 @@ def scrap_data_smartcount_relevant_product(driver, asin):
         # You can also set the maximum value if needed
         asin_input.clear()
         asin_input.send_keys(asin)
-        time.sleep(2)
+        time.sleep(12)
         print("searchbutton")
         search_button = wait.until(
             EC.element_to_be_clickable((By.XPATH, '//*[@id="btnSearchProducts"]'))
@@ -223,7 +224,7 @@ def scrap_data_smartcount_relevant_product(driver, asin):
 
         # Click the image
         image.click()
-        time.sleep(5)
+        time.sleep(10)
         print("newest_file")
 
         file_path = download_dir
@@ -390,7 +391,7 @@ def scrap_data_smartcount_product(driver, asin):
 
         # Click the image
         image.click()
-        time.sleep(5)
+        time.sleep(10)
         print("newest_file")
 
         file_path = download_dir
@@ -532,7 +533,7 @@ def fetch_asin_tokeyword(asin):
         # Fetch all results
         results = cur.fetchall()
         # Extract the asin values from the results
-        asins = [item['asin'] for item in results]
+        asins = [item["asin"] for item in results]
         subset_size = 10
         subsets = [
             ", ".join(asins[i : i + subset_size])
@@ -546,6 +547,7 @@ def fetch_asin_tokeyword(asin):
     finally:
         if conn:
             conn.close()
+
 
 def scrap_helium_asin_keyword(
     driver, asin, username="forheliumonly@gmail.com", password="qz6EvRm65L3HdjM2!!@#$"
@@ -585,7 +587,7 @@ def scrap_helium_asin_keyword(
         # You can also set the maximum value if needed
         asin_input.clear()
         asin_input.send_keys(asin)
-        time.sleep(2)
+        time.sleep(5)
         asin_input.send_keys(Keys.SPACE)
         print("Get Keyword Button")
         getkeyword_button = wait.until(
@@ -728,4 +730,6 @@ if __name__ == "__main__":
     # Example list of ASINs input by the user
     user_asins = ["B07VPWR7YY"]
     user_asins = [asin for asin in user_asins if not fetch_existing_relevant_asin(asin)]
-    main(user_asins)
+    if user_asins:
+        main(user_asins)
+    
