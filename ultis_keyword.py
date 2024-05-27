@@ -36,7 +36,7 @@ gmt7_offset = timedelta(hours=7)
 current_time_gmt7 = current_utc_time + gmt7_offset
 
 # Replace these with your Keepa username and password
-username = "nguyen.quang.tung85@gmail.com"
+username = "uty.tra@thebargainvillage.com"
 password = "D8RLPA7$kxG!9zh"
 
 # Gmail App Password
@@ -60,12 +60,11 @@ with tempfile.TemporaryDirectory() as download_dir:
     options = [
         # Define window size here
         "--ignore-certificate-errors",
-        # "--headless=new",
+        "--headless=new",
         "--disable-gpu",
         "--no-sandbox",
         "--disable-dev-shm-usage",
         "--window-size=1920,1080",
-        # "--remote-debugging-port=9222",
         "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36",
         "accept-language=en-US",
     ]
@@ -755,6 +754,6 @@ def main(asins):
 
 if __name__ == "__main__":
     # Example list of ASINs input by the user
-    user_asins = ["B07VPWR7YY", "B08K2S3P2H", "B07XJ8C8F5"]
+    user_asins = ["B07VPWR7YY"]
     user_asins = [asin for asin in user_asins if not fetch_existing_relevant_asin(asin)]
     main(user_asins)
