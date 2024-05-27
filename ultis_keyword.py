@@ -39,12 +39,6 @@ current_time_gmt7 = current_utc_time + gmt7_offset
 username = "uty.tra@thebargainvillage.com"
 password = "D8RLPA7$kxG!9zh"
 
-# Gmail App Password
-server = "imap.gmail.com"
-email_address = "uty.tra@thebargainvillage.com"
-email_password = "kwuh xdki tstu vyct"
-subject_filter = "Keepa.com Account Security Alert and One-Time Login Code"
-
 dir_path = os.path.dirname(os.path.realpath(__file__))
 # Create a temporary directory for downloads
 with tempfile.TemporaryDirectory() as download_dir:
@@ -68,7 +62,8 @@ with tempfile.TemporaryDirectory() as download_dir:
         "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36",
         "accept-language=en-US",
     ]
-    chrome_options.add_argument('--proxy-server=50.175.212.79:80')
+    # PROXY = "50.175.212.79:80"
+    # chrome_options.add_argument(f"--proxy-server={PROXY}")
     chrome_options.add_experimental_option("prefs", prefs)
 
     for option in options:
@@ -118,38 +113,6 @@ def format_header(header):
         unicodedata.normalize("NFKD", header).encode("ASCII", "ignore").decode("ASCII")
     )
     return header
-
-
-def get_otp_from_email(server, email_address, email_password, subject_filter):
-    mail = imaplib.IMAP4_SSL(server)
-    mail.login(email_address, email_password)
-    mail.select("inbox")
-
-    status, data = mail.search(None, '(SUBJECT "{}")'.format(subject_filter))
-    mail_ids = data[0].split()
-
-    latest_email_id = mail_ids[-1]
-    status, data = mail.fetch(latest_email_id, "(RFC822)")
-
-    raw_email = data[0][1].decode("utf-8")
-    email_message = email.message_from_bytes(data[0][1])
-
-    otp_pattern = re.compile(r"\b\d{6}\b")
-
-    if email_message.is_multipart():
-        for part in email_message.walk():
-            content_type = part.get_content_type()
-            if "text/plain" in content_type or "text/html" in content_type:
-                email_content = part.get_payload(decode=True).decode()
-                match = otp_pattern.search(email_content)
-                if match:
-                    return match.group(0)
-    else:
-        email_content = email_message.get_payload(decode=True).decode()
-        match = otp_pattern.search(email_content)
-        if match:
-            return match.group(0)
-    return None
 
 
 def smartscouts_next_login(driver, username=username, password=password):
@@ -260,7 +223,7 @@ def scrap_data_smartcount_relevant_product(driver, asin):
 
         # Click the image
         image.click()
-        time.sleep(10)
+        time.sleep(5)
         print("newest_file")
 
         file_path = download_dir
@@ -551,7 +514,15 @@ def fetch_asin_tokeyword(asin):
         cur = conn.cursor()
         # Execute a query
         cur.execute(
-            "select distinct a.asin from products_smartscount a left join products_relevant_smartscounts b on a.asin=b.asin_relevant and a.sys_run_date=b.sys_run_date where a.sys_run_date=%s and b.asin=%s order by a.estimated_monthly_revenue desc limit 20",
+            """
+            SELECT a.*
+            FROM products_smartscount a
+            LEFT JOIN products_relevant_smartscounts b
+            ON a.asin = b.asin_relevant AND a.sys_run_date = b.sys_run_date
+            WHERE a.sys_run_date = %s AND b.asin = %s
+            ORDER BY a.estimated_monthly_revenue DESC
+            LIMIT 20
+            """,
             (
                 str(current_time_gmt7.strftime("%Y-%m-%d")),
                 asin,
@@ -559,9 +530,9 @@ def fetch_asin_tokeyword(asin):
         )
 
         # Fetch all results
-        asins = cur.fetchall()
-        # Convert list of tuples to list
-        asins = [item[0] for item in asins]
+        results = cur.fetchall()
+        # Extract the asin values from the results
+        asins = [item[0] for item in results]
         subset_size = 10
         subsets = [
             ", ".join(asins[i : i + subset_size])
@@ -576,7 +547,6 @@ def fetch_asin_tokeyword(asin):
         if conn:
             conn.close()
 
-
 def scrap_helium_asin_keyword(
     driver, asin, username="forheliumonly@gmail.com", password="qz6EvRm65L3HdjM2!!@#$"
 ):
@@ -587,6 +557,7 @@ def scrap_helium_asin_keyword(
     print("login")
     # Login process
     try:
+        # driver.get("https://members.helium10.com/cerebro?accountId=1544526096")
         username_field = wait.until(
             EC.visibility_of_element_located((By.ID, "loginform-email"))
         )
