@@ -14,8 +14,6 @@ host = "aws-0-us-west-1.pooler.supabase.com"
 offset_hours = 7
 
 [selenium]
-username = "uty.tra@thebargainvillage.com"
-password = "D8RLPA7$kxG!9zh"
 chrome_options = [
     "--ignore-certificate-errors",
     "--headless=new",
@@ -29,3 +27,8 @@ chrome_options = [
 
 [paths]
 extension_path = "CapMonster-Cloud-—-automated-captcha-solver.crx"
+
+[smartscount]
+# Replace these with your Keepa username and password
+username = "uty.tra@thebargainvillage.com"
+password = "D8RLPA7$kxG!9zh"
