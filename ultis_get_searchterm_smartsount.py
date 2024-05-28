@@ -3,19 +3,12 @@ import os
 import tempfile
 import time
 import pandas as pd
-import psycopg2
-import psycopg2.extras
-from datetime import datetime, timedelta
-from supabase import create_client, Client
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.action_chains import ActionChains
-from selenium.common.exceptions import TimeoutException
-from webdriver_manager.chrome import ChromeDriverManager
 import traceback
+import numpy as np
 from config import config, format_header, get_newest_file
 
 # Initialize Supabase client

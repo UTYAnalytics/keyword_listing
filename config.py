@@ -6,6 +6,7 @@ from supabase import create_client, Client
 from datetime import datetime, timedelta
 import unicodedata
 
+
 class Config:
     def __init__(self, config_path="config.toml"):
         self.config = toml.load(config_path)
@@ -55,6 +56,7 @@ def format_header(header):
     )
     return header
 
+
 # Utility function to get the newest file in a directory
 def get_newest_file(directory):
     files = glob.glob(os.path.join(directory, "*"))
@@ -62,5 +64,7 @@ def get_newest_file(directory):
         return None
     newest_file = max(files, key=os.path.getmtime)
     return newest_file
+
+
 # Initialize the configuration
 config = Config()
