@@ -23,10 +23,11 @@ from selenium.webdriver.chrome.service import Service
 import traceback
 from webdriver_manager.chrome import ChromeDriverManager
 from multiprocessing import Pool
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import traceback
 import subprocess
 from psycopg2.extras import DictCursor
+from selenium.webdriver.common.action_chains import ActionChains
 
 SUPABASE_URL = "https://sxoqzllwkjfluhskqlfl.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4b3F6bGx3a2pmbHVoc2txbGZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDIyODE1MTcsImV4cCI6MjAxNzg1NzUxN30.FInynnvuqN8JeonrHa9pTXuQXMp9tE4LO0g5gj0adYE"
@@ -105,6 +106,7 @@ def fetch_existing_relevant_asin(asin):
         if conn:
             conn.close()
 
+
 def fetch_existing_relevant_asin_main():
     conn = None
     try:
@@ -119,9 +121,7 @@ def fetch_existing_relevant_asin_main():
         # Execute a query
         cur.execute(
             "SELECT distinct asin_relevant FROM products_relevant_smartscounts a where a.sys_run_date = %s ",
-            (
-                str(current_time_gmt7.strftime("%Y-%m-%d")),
-            ),
+            (str(current_time_gmt7.strftime("%Y-%m-%d")),),
         )
 
         # Fetch all results
@@ -135,6 +135,7 @@ def fetch_existing_relevant_asin_main():
     finally:
         if conn:
             conn.close()
+
 
 def format_header(header):
     # Convert to lowercase
@@ -177,9 +178,7 @@ def start_driver(asin):
         time.sleep(5)
         relevant_asins = fetch_existing_relevant_asin(asin)
         scrap_data_smartcount_product(driver, relevant_asins)
-        time.sleep(5)
         captcha_solver(driver)
-        time.sleep(2)
         scrap_helium_asin_keyword(driver, fetch_asin_tokeyword(asin))
     finally:
         driver.quit()
@@ -522,22 +521,6 @@ def scrap_data_smartcount_product(driver, asin):
         traceback.print_exc()
 
 
-# def connect_vpn(config_file):
-#     try:
-#         subprocess.run(["openvpn", "--config", config_file], check=True)
-#         print(f"Connected to VPN using {config_file}")
-#     except subprocess.CalledProcessError as e:
-#         print(f"Error connecting to VPN: {e}")
-
-
-# def disconnect_vpn():
-#     try:
-#         subprocess.run(["pkill", "openvpn"], check=True)
-#         print("Disconnected from VPN")
-#     except subprocess.CalledProcessError as e:
-#         print(f"Error disconnecting from VPN: {e}")
-
-
 def fetch_asin_tokeyword(asin):
     conn = None
     try:
@@ -621,182 +604,272 @@ def captcha_solver(driver, API="7f97e318653cc85d2d7bc5efdfb1ea9f"):
             EC.element_to_be_clickable((By.CSS_SELECTOR, "button#client-key-save-btn"))
         )
         save_button.click()
+        time.sleep(2)
+        # Interact with the radio buttons
+        token_radio_button = wait.until(
+            EC.element_to_be_clickable((By.CLASS_NAME, "ant-radio-button-wrapper"))
+        )
+        token_radio_button.click()
     except Exception as e:
         # raise Exception
         print("Error during captcha:", e)
 
 
 def scrap_helium_asin_keyword(
-    driver, asin, username="forheliumonly@gmail.com", password="qz6EvRm65L3HdjM2!!@#$"
+    driver,
+    asin,
+    username="forheliumonly@gmail.com",
+    password="qz6EvRm65L3HdjM2!!@#$",
+    download_dir="path/to/download",
 ):
-    # connect_vpn("/us-hou.prod.surfshark.comsurfshark_openvpn_tcp.ovpn")
     # Open Helium10
     driver.get("https://members.helium10.com/cerebro?accountId=1544526096")
     wait = WebDriverWait(driver, 30)
     print("login")
+
     # Login process
     try:
-
-        # driver.get("https://members.helium10.com/cerebro?accountId=1544526096")
         username_field = wait.until(
             EC.visibility_of_element_located((By.ID, "loginform-email"))
         )
         username_field.send_keys(username)
         password_field = driver.find_element(By.ID, "loginform-password")
         password_field.send_keys(password)
-        time.sleep(50)
+
+        # Loop to check the status until it is "Ready"
+        status_ready = False
+        while not status_ready:
+            try:
+                status_element = wait.until(
+                    EC.visibility_of_element_located(
+                        (By.CSS_SELECTOR, "div.cm-addon-inner span")
+                    )
+                )
+                status_text = status_element.text
+
+                if status_text == "Ready!":
+                    print("Status: Ready")
+                    status_ready = True
+                elif status_text == "In Process...":
+                    print("Status: In Progress")
+                else:
+                    print("Status: Unknown -", status_text)
+                    time.sleep(1)
+            except Exception as e:
+                print("Error checking status:", e)
+                time.sleep(1)
+
+        # Submit the form after the status is "Ready"
         password_field.send_keys(Keys.RETURN)
+
     except Exception as e:
-        # raise Exception
-        print("Error during login:", e)
-    # Navigate to the Reverse Asin
-    try:
-        print("asininput")
-
-        asin_input = WebDriverWait(driver, 10).until(
-            EC.visibility_of_element_located(
-                (
-                    By.CSS_SELECTOR,
-                    'input[placeholder="Enter up to 10 product identifiers for keyword comparison."]',
-                )
-            )
-        )
-
-        # You can also set the maximum value if needed
-        asin_input.clear()
-        asin_input.send_keys(asin)
-        time.sleep(5)
-        asin_input.send_keys(Keys.SPACE)
-        print("Get Keyword Button")
-        getkeyword_button = wait.until(
-            EC.element_to_be_clickable(
-                (By.XPATH, "//button[@data-testid='getkeywords']")
-            )
-        )
-        print("Get Keyword Button_click")
-        getkeyword_button.click()
-        time.sleep(2)
-
-        timeout = 10
-        try:
-            # Wait for the popup to be visible
-            popup_visible = WebDriverWait(driver, timeout).until(
-                EC.visibility_of_element_located((By.CSS_SELECTOR, ".sc-yRUbj.iYFpRQ"))
-            )
-            # If the popup is visible, find and click the "Run New Search" button
-            if popup_visible:
-                run_new_search_button = driver.find_element(
-                    By.CSS_SELECTOR, "button[data-testid='runnewsearch']"
-                )
-                run_new_search_button.click()
-                print("Clicked on 'Run New Search'.")
-        except TimeoutException:
-            # If the popup is not found within the timeout, handle it (e.g., by logging or skipping)
-            print("Popup not found within the timeout period.")
-
-        time.sleep(25)
-        driver.get_screenshot_as_file("screenshot.png")
-
-        element = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located(
-                (By.XPATH, "//button[@data-testid='export']")
-            )  # Replace "element_id" with the actual ID of the element
-        )
-        driver.execute_script("arguments[0].scrollIntoView();", element)
-
-        print("Click Export data")
-        export_data_button = driver.find_element(
-            By.CSS_SELECTOR, "button[data-testid='exportdata']"
-        )
-        # Use JavaScript to click on the element
-        driver.execute_script("arguments[0].click();", export_data_button)
-        time.sleep(2)
-
-        print("Clicked the '...as a CSV file' option.")
-        data_testid = "csv"
-        csv_option = WebDriverWait(driver, 20).until(
-            EC.element_to_be_clickable(
-                (By.CSS_SELECTOR, f'div[data-testid="{data_testid}"]')
-            )
-        )
-        csv_option.click()
-
-        time.sleep(5)
-        print("newest_file")
-
-        file_path = download_dir
-
-        newest_file_path = get_newest_file(file_path)
-
-        if newest_file_path:
-            data = pd.read_csv(newest_file_path)
-            # data["sys_run_date"] = current_time_gmt7.strftime("%Y-%m-%d %H:%M:%S")
-
-            data = data.replace("-", None)
-            data["sys_run_date"] = current_time_gmt7
-            # Proceed with the database insertion
-        else:
-            print("No files found in the specified directory.")
-        # Extract the header row
-        headers = [
-            "keyword_phrase",
-            "aba_total_click_share",
-            "aba_total_conv_share",
-            "keyword_sales",
-            "cerebro_iq_score",
-            "search_volume",
-            "search_volume_trend",
-            "h10_ppc_sugg_bid",
-            "h10_ppc_sugg_min_bid",
-            "h10_ppc_sugg_max_bid",
-            "sponsored_asins",
-            "competing_products",
-            "cpr",
-            "title_density",
-            "organic",
-            "sponsored_product",
-            "amazon_recommended",
-            "editorial_recommendations",
-            "amazon_choice",
-            "highly_rated",
-            "sponsored_brand_header",
-            "sponsored_brand_video",
-            "top_rated_from_our_brand",
-            "trending_now",
-            "amazon_rec_rank",
-            "sponsored_rank",
-            "organic_rank",
-            "sys_run_date",
-        ]
-
-        data.columns = headers
-        data.insert(0, "asin", "")
-
-        try:
-            # Convert rows to list of dictionaries and handle NaN values
-            rows_list = data.replace({np.nan: None}).to_dict(orient="records")
-
-            # Generate MD5 hash as the primary key for each row
-            for row_dict in rows_list:
-                row_dict["asin"] = str(asin)
-
-            # Insert the rows into the database using executemany
-            response = (
-                supabase.table("reverse_product_lookup_helium")
-                .upsert(rows_list)
-                .execute()
-            )
-
-            if hasattr(response, "error") and response.error is not None:
-                raise Exception(f"Error inserting rows: {response.error}")
-            print(f"Rows inserted successfully")
-        except Exception as e:
-            print(f"Error with rows: {e}")
-    except Exception as e:
-        print(e)
+        print(f"Error during login: {e}")
         traceback.print_exc()
-    # finally:
-    #     disconnect_vpn()
+        return
+
+    for subset in asin:
+        try:
+            check = WebDriverWait(driver, 30).until(
+                EC.presence_of_element_located(
+                    (
+                        By.CSS_SELECTOR,
+                        "input[placeholder='Enter up to 10 product identifiers for keyword comparison.']",
+                    )
+                )
+            )
+        except:
+            try:
+                check = WebDriverWait(driver, 30).until(
+                    EC.presence_of_element_located(
+                        (
+                            By.CSS_SELECTOR,
+                            "input[placeholder='Enter up to 0 product identifiers for keyword comparison.']",
+                        )
+                    )
+                )
+            except TimeoutException:
+                print("Main page did not load after login.")
+                continue
+
+        try:
+            print("asininput")
+            asin_input = WebDriverWait(driver, 10).until(
+                EC.visibility_of_element_located(
+                    (
+                        By.CSS_SELECTOR,
+                        'input[placeholder="Enter up to 10 product identifiers for keyword comparison."]',
+                    )
+                )
+            )
+            asin_input.clear()
+            asin_input.send_keys(subset)
+            time.sleep(2)
+            asin_input.send_keys(Keys.SPACE)
+
+            print("Get Keyword Button")
+            getkeyword_button = wait.until(
+                EC.element_to_be_clickable(
+                    (By.XPATH, "//button[@data-testid='getkeywords']")
+                )
+            )
+            print("Get Keyword Button_click")
+            getkeyword_button.click()
+            time.sleep(2)
+
+            timeout = 10
+            try:
+                popup_visible = WebDriverWait(driver, timeout).until(
+                    EC.visibility_of_element_located(
+                        (By.CSS_SELECTOR, ".sc-yRUbj.iYFpRQ")
+                    )
+                )
+                if popup_visible:
+                    run_new_search_button = driver.find_element(
+                        By.CSS_SELECTOR, "button[data-testid='runnewsearch']"
+                    )
+                    run_new_search_button.click()
+                    print("Clicked on 'Run New Search'.")
+            except TimeoutException:
+                print("Popup not found within the timeout period.")
+            driver.get_screenshot_as_file("screenshot.png")
+
+            time.sleep(25)
+            element = WebDriverWait(driver, 600).until(
+                EC.presence_of_element_located(
+                    (By.XPATH, "//button[@data-testid='export']")
+                )
+            )
+            driver.execute_script("arguments[0].scrollIntoView();", element)
+
+            print("Click Export data")
+            export_data_button = driver.find_element(
+                By.CSS_SELECTOR, "button[data-testid='exportdata']"
+            )
+            driver.execute_script("arguments[0].click();", export_data_button)
+            print("Clicked the '...as a CSV file' option.")
+            data_testid = "csv"
+            actions = ActionChains(driver)
+            csv_option = WebDriverWait(driver, 20).until(
+                EC.element_to_be_clickable(
+                    (By.CSS_SELECTOR, f'div[data-testid="{data_testid}"]')
+                )
+            )
+            actions.move_to_element(csv_option).click().perform()
+
+            time.sleep(15)
+            print("newest_file")
+
+            newest_file_path = get_newest_file(download_dir)
+
+            if newest_file_path:
+                data_df = pd.read_csv(newest_file_path)
+                data_df = data_df.replace("-", None)
+                data_df["sys_run_date"] = datetime.now().strftime("%Y-%m-%d")
+            else:
+                print("No files found in the specified directory.")
+                continue
+
+            columns_to_extract = [
+                "Keyword Phrase",
+                "ABA Total Click Share",
+                "ABA Total Conv. Share",
+                "Keyword Sales",
+                "Cerebro IQ Score",
+                "Search Volume",
+                "Search Volume Trend",
+                "H10 PPC Sugg. Bid",
+                "H10 PPC Sugg. Min Bid",
+                "H10 PPC Sugg. Max Bid",
+                "Sponsored ASINs",
+                "Competing Products",
+                "CPR",
+                "Title Density",
+                "Organic",
+                "Sponsored Product",
+                "Amazon Recommended",
+                "Editorial Recommendations",
+                "Amazon Choice",
+                "Highly Rated",
+                "Sponsored Brand Header",
+                "Sponsored Brand Video",
+                "Top Rated From Our Brand",
+                "Trending Now",
+                "Sponsored Rank (avg)",
+                "Sponsored Rank (count)",
+                "Amazon Recommended Rank (avg)",
+                "Amazon Recommended Rank (count)",
+                "Position (Rank)",
+                "Relative Rank",
+                "Competitor Rank (avg)",
+                "Ranking Competitors (count)",
+                "Competitor Performance Score",
+                "sys_run_date",
+            ]
+            headers = [
+                "keyword_phrase",
+                "aba_total_click_share",
+                "aba_total_conv_share",
+                "keyword_sales",
+                "cerebro_iq_score",
+                "search_volume",
+                "search_volume_trend",
+                "h10_ppc_sugg_bid",
+                "h10_ppc_sugg_min_bid",
+                "h10_ppc_sugg_max_bid",
+                "sponsored_asins",
+                "competing_products",
+                "cpr",
+                "title_density",
+                "organic",
+                "sponsored_product",
+                "amazon_recommended",
+                "editorial_recommendations",
+                "amazon_choice",
+                "highly_rated",
+                "sponsored_brand_header",
+                "sponsored_brand_video",
+                "top_rated_from_our_brand",
+                "trending_now",
+                "sponsored_rank_avg",
+                "sponsored_rank_count",
+                "amazon_recommended_rank_avg",
+                "amazon_recommended_rank_count",
+                "position_rank",
+                "relative_rank",
+                "competitor_rank_avg",
+                "ranking_competitors_count",
+                "competitor_performance_score",
+                "sys_run_date",
+            ]
+
+            data = data_df[columns_to_extract]
+            data.columns = headers
+            data.insert(0, "asin", "")
+
+            try:
+                rows_list = (
+                    data.replace({np.nan: None})
+                    .replace({"-": None})
+                    .to_dict(orient="records")
+                )
+
+                for row_dict in rows_list:
+                    row_dict["asin"] = str(subset)
+
+                response = (
+                    supabase.table("reverse_product_lookup_helium")
+                    .upsert(rows_list)
+                    .execute()
+                )
+
+                if hasattr(response, "error") and response.error is not None:
+                    raise Exception(f"Error inserting rows: {response.error}")
+                print("Rows inserted successfully")
+            except Exception as e:
+                print(f"Error with rows: {e}")
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
 
 
 def main(asins):
@@ -807,6 +880,6 @@ def main(asins):
 if __name__ == "__main__":
     # Example list of ASINs input by the user
     user_asins = ["B07VPWR7YY"]
-    user_asins = [asin for asin in user_asins if not fetch_existing_relevant_asin_main()]
+    user_asins = [asin for asin in user_asins if not fetch_existing_relevant_asin(asin)]
     if user_asins:
         main(user_asins)
