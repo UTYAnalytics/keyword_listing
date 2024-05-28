@@ -12,21 +12,15 @@ import pandas as pd
 import psycopg2
 import glob
 from supabase import create_client, Client
-import re
 import unicodedata
-import imaplib
-import email
-import re
 from datetime import datetime, timedelta
 import numpy as np
 from selenium.webdriver.chrome.service import Service
 import traceback
 from webdriver_manager.chrome import ChromeDriverManager
 from multiprocessing import Pool
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.common.exceptions import TimeoutException
 import traceback
-import subprocess
-from psycopg2.extras import DictCursor
 from selenium.webdriver.common.action_chains import ActionChains
 
 SUPABASE_URL = "https://sxoqzllwkjfluhskqlfl.supabase.co"
@@ -558,8 +552,8 @@ def fetch_asin_tokeyword(asin):
             ", ".join(asins[i : i + subset_size])
             for i in range(0, len(asins), subset_size)
         ]
-
-        return subsets
+        asin_parent = asin
+        return asin_parent, subsets
     except Exception as e:
         print(f"Database error: {e}")
         return []
@@ -620,8 +614,8 @@ def scrap_helium_asin_keyword(
     asin,
     username="forheliumonly@gmail.com",
     password="qz6EvRm65L3HdjM2!!@#$",
-    download_dir="path/to/download",
 ):
+    asin_parent, subsets = asin
     # Open Helium10
     driver.get("https://members.helium10.com/cerebro?accountId=1544526096")
     wait = WebDriverWait(driver, 30)
@@ -635,8 +629,6 @@ def scrap_helium_asin_keyword(
         username_field.send_keys(username)
         password_field = driver.find_element(By.ID, "loginform-password")
         password_field.send_keys(password)
-
-        # Loop to check the status until it is "Ready"
         status_ready = False
         while not status_ready:
             try:
@@ -646,7 +638,6 @@ def scrap_helium_asin_keyword(
                     )
                 )
                 status_text = status_element.text
-
                 if status_text == "Ready!":
                     print("Status: Ready")
                     status_ready = True
@@ -658,42 +649,20 @@ def scrap_helium_asin_keyword(
             except Exception as e:
                 print("Error checking status:", e)
                 time.sleep(1)
+                password_field.send_keys(Keys.RETURN)
 
-        # Submit the form after the status is "Ready"
         password_field.send_keys(Keys.RETURN)
-
+        time.sleep(2)
     except Exception as e:
         print(f"Error during login: {e}")
         traceback.print_exc()
         return
 
-    for subset in asin:
-        try:
-            check = WebDriverWait(driver, 30).until(
-                EC.presence_of_element_located(
-                    (
-                        By.CSS_SELECTOR,
-                        "input[placeholder='Enter up to 10 product identifiers for keyword comparison.']",
-                    )
-                )
-            )
-        except:
-            try:
-                check = WebDriverWait(driver, 30).until(
-                    EC.presence_of_element_located(
-                        (
-                            By.CSS_SELECTOR,
-                            "input[placeholder='Enter up to 0 product identifiers for keyword comparison.']",
-                        )
-                    )
-                )
-            except TimeoutException:
-                print("Main page did not load after login.")
-                continue
-
+    for subset in subsets:
+        driver.refresh()
         try:
             print("asininput")
-            asin_input = WebDriverWait(driver, 10).until(
+            asin_input = WebDriverWait(driver, 30).until(
                 EC.visibility_of_element_located(
                     (
                         By.CSS_SELECTOR,
@@ -732,8 +701,6 @@ def scrap_helium_asin_keyword(
             except TimeoutException:
                 print("Popup not found within the timeout period.")
             driver.get_screenshot_as_file("screenshot.png")
-
-            time.sleep(25)
             element = WebDriverWait(driver, 600).until(
                 EC.presence_of_element_located(
                     (By.XPATH, "//button[@data-testid='export']")
@@ -756,10 +723,10 @@ def scrap_helium_asin_keyword(
             )
             actions.move_to_element(csv_option).click().perform()
 
-            time.sleep(15)
+            time.sleep(25)
             print("newest_file")
-
-            newest_file_path = get_newest_file(download_dir)
+            file_path = download_dir
+            newest_file_path = get_newest_file(file_path)
 
             if newest_file_path:
                 data_df = pd.read_csv(newest_file_path)
@@ -845,7 +812,7 @@ def scrap_helium_asin_keyword(
             data = data_df[columns_to_extract]
             data.columns = headers
             data.insert(0, "asin", "")
-
+            data.insert(0, "asin_parent", "")
             try:
                 rows_list = (
                     data.replace({np.nan: None})
@@ -855,6 +822,7 @@ def scrap_helium_asin_keyword(
 
                 for row_dict in rows_list:
                     row_dict["asin"] = str(subset)
+                    row_dict["asin_parent"] = str(asin_parent)
 
                 response = (
                     supabase.table("reverse_product_lookup_helium")

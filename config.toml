@@ -1,0 +1,31 @@
+# config.toml
+
+[supabase]
+url = "https://sxoqzllwkjfluhskqlfl.supabase.co"
+key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4b3F6bGx3a2pmbHVoc2txbGZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDIyODE1MTcsImV4cCI6MjAxNzg1NzUxN30.FInynnvuqN8JeonrHa9pTXuQXMp9tE4LO0g5gj0adYE"
+
+[database]
+dbname = "postgres"
+user = "postgres.sxoqzllwkjfluhskqlfl"
+password = "5giE*5Y5Uexi3P2"
+host = "aws-0-us-west-1.pooler.supabase.com"
+
+[timezone]
+offset_hours = 7
+
+[selenium]
+username = "uty.tra@thebargainvillage.com"
+password = "D8RLPA7$kxG!9zh"
+chrome_options = [
+    "--ignore-certificate-errors",
+    "--headless=new",
+    "--disable-gpu",
+    "--no-sandbox",
+    "--disable-dev-shm-usage",
+    "--window-size=1920,1080",
+    "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36",
+    "accept-language=en-US"
+]
+
+[paths]
+extension_path = "CapMonster-Cloud-—-automated-captcha-solver.crx"
