@@ -98,6 +98,81 @@ def fetch_existing_relevant_asin_main():
             conn.close()
 
 
+def get_asin_auto_listing_table():
+    conn = None
+    try:
+        # Connect to your database
+        conn = psycopg2.connect(
+            dbname=db_config["dbname"],
+            user=db_config["user"],
+            password=db_config["password"],
+            host=db_config["host"],
+        )
+        cur = conn.cursor()
+        # Execute a query
+        cur.execute(
+            "SELECT distinct asin FROM auto_listing_table a where a.keyword is null",
+        )
+
+        # Fetch all results
+        asins = cur.fetchall()
+        # Convert list of tuples to list
+        asins = [item[0] for item in asins]
+        return asins
+    except Exception as e:
+        print(f"Database error: {e}")
+        return []
+    finally:
+        if conn:
+            conn.close()
+
+
+def update_keyword_auto_listing():
+    conn = None
+    try:
+        # Connect to your database
+        conn = psycopg2.connect(
+            dbname=db_config["dbname"],
+            user=db_config["user"],
+            password=db_config["password"],
+            host=db_config["host"],
+        )
+        cur = conn.cursor()
+        # Execute a query
+        cur.execute(
+            """-- Step 1: Create a CTE to concatenate keyword phrases grouped by asin_parent
+WITH keyword_phrases AS (
+    SELECT 
+        asin_parent,
+        STRING_AGG(keyword_phrase, ', ') AS concatenated_keywords
+    FROM 
+        reverse_product_lookup_helium
+    GROUP BY 
+        asin_parent
+)
+
+-- Step 2: Update the auto_listing_table with the concatenated keyword phrases using LEFT JOIN
+UPDATE 
+    auto_listing_table alt
+SET 
+    keyword = kp.concatenated_keywords
+FROM 
+    keyword_phrases kp
+WHERE 
+    alt.keyword IS NULL
+    AND kp.asin_parent = alt.asin;
+
+"""
+        )
+        # Commit the transaction
+        conn.commit()
+    except Exception as e:
+        print(f"Database error: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+
 def smartscouts_next_login(driver, username=username, password=password):
     driver.get("https://app.smartscout.com/sessions/signin")
     wait = WebDriverWait(driver, 30)
@@ -117,23 +192,40 @@ def smartscouts_next_login(driver, username=username, password=password):
         print("Error during login:", e)
 
 
+def clear_session_and_refresh(driver):
+    driver.delete_all_cookies()
+    driver.execute_script("window.localStorage.clear();")
+    driver.execute_script("window.sessionStorage.clear();")
+
+
 def start_driver(asin):
     # chromedriver_path = os.path.join(dir_path, 'chromedriver.exe')  # Ensure this path is correct
     chrome_service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=chrome_service, options=chrome_options)
     user_asins = []
     try:
-        user_asins = [
-            asin for asin in user_asins if not fetch_existing_relevant_asin_main()
-        ]
-        if user_asins:
-            smartscouts_next_login(driver, username, password)
-            scrap_data_smartcount_relevant_product(driver, asin, download_dir)
-            time.sleep(5)
+        while True:
+            user_asins = [
+                asin for asin in user_asins if not fetch_existing_relevant_asin_main()
+            ]
+            if user_asins:
+                smartscouts_next_login(driver, username, password)
+                scrap_data_smartcount_relevant_product(driver, asin, download_dir)
+                time.sleep(5)
+
             relevant_asins = fetch_existing_relevant_asin(asin)
-            scrap_data_smartcount_product(driver, relevant_asins, download_dir)
-        captcha_solver(driver, chrome_options)
-        scrap_helium_asin_keyword(driver, fetch_asin_tokeyword(asin), download_dir)
+            if relevant_asins:
+                scrap_data_smartcount_product(driver, relevant_asins, download_dir)
+            asin_to_keywords = fetch_asin_tokeyword(asin)
+            if asin_to_keywords:
+                captcha_solver(driver, chrome_options)
+                scrap_helium_asin_keyword(
+                    driver, fetch_asin_tokeyword(asin), download_dir
+                )
+            driver.quit()
+            update_keyword_auto_listing()
+            time.sleep(10)
+
     finally:
         driver.quit()
 
@@ -145,5 +237,5 @@ def main(asins):
 
 if __name__ == "__main__":
     # Example list of ASINs input by the user
-    user_asins = ["B07VPWR7YY"]
+    user_asins = get_asin_auto_listing_table()
     main(user_asins)
