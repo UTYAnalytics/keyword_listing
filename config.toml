@@ -27,6 +27,7 @@ chrome_options = [
 
 [paths]
 extension_path = "CapMonster-Cloud-—-automated-captcha-solver.crx"
+extension_id="pabjfbciaedomjjfelfafejkppknjleh"
 
 [smartscount]
 # Replace these with your Keepa username and password

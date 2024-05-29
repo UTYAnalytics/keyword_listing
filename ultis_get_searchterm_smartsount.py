@@ -17,32 +17,13 @@ supabase = config.supabase
 # Get timezone offset and calculate current time in GMT+7
 current_time_gmt7 = config.current_time_gmt7
 
-# Get Selenium configuration
-chrome_options_list = config.get_selenium_config()
+# # Path to your extension .crx, extension_id file
+extension_path, extension_id = config.get_paths_config()
 
-# Get paths configuration
-extension_path = config.get_paths_config()
-
-# Create a temporary directory for downloads
-with tempfile.TemporaryDirectory() as download_dir:
-    # Chrome options
-    chrome_options = webdriver.ChromeOptions()
-    prefs = {
-        "download.default_directory": download_dir,
-        "download.prompt_for_download": False,
-        "download.directory_upgrade": True,
-        "safebrowsing.enabled": True,
-    }
-    chrome_options.add_experimental_option("prefs", prefs)
-
-    for option in chrome_options_list:
-        chrome_options.add_argument(option)
-
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    chrome_options.add_extension(os.path.join(dir_path, extension_path))
+db_config = config.get_database_config()
 
 
-def scrap_data_smartcount_relevant_product(driver, asin):
+def scrap_data_smartcount_relevant_product(driver, asin, download_dir):
     print("searchterm")
     wait = WebDriverWait(driver, 30)
     try:

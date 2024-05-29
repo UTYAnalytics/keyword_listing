@@ -17,6 +17,9 @@ class Config:
         supabase_config = self.config.get("supabase", {})
         return supabase_config["url"], supabase_config["key"]
 
+    def get_database_config(self):
+        return self.config.get("database", {})
+
     def get_timezone_offset(self):
         timezone_config = self.config.get("timezone", {})
         return timezone_config.get("offset_hours", 0)
@@ -37,7 +40,7 @@ class Config:
 
     def get_paths_config(self):
         paths_config = self.config.get("paths", {})
-        return paths_config.get("extension_path", "")
+        return paths_config["extension_path"], paths_config["extension_id"]
 
     def get_smartscount(self):
         smartscount_config = self.config.get("smartscount", {})

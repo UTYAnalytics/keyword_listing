@@ -12,36 +12,13 @@ from config import config, format_header, get_newest_file
 import psycopg2
 import numpy as np
 
-
 # Initialize Supabase client
 supabase = config.supabase
 
 # Get timezone offset and calculate current time in GMT+7
 current_time_gmt7 = config.current_time_gmt7
 
-# Get Selenium configuration
-chrome_options_list = config.get_selenium_config()
-
-# Get paths configuration
-extension_path = config.get_paths_config()
-
-# Create a temporary directory for downloads
-with tempfile.TemporaryDirectory() as download_dir:
-    # Chrome options
-    chrome_options = webdriver.ChromeOptions()
-    prefs = {
-        "download.default_directory": download_dir,
-        "download.prompt_for_download": False,
-        "download.directory_upgrade": True,
-        "safebrowsing.enabled": True,
-    }
-    chrome_options.add_experimental_option("prefs", prefs)
-
-    for option in chrome_options_list:
-        chrome_options.add_argument(option)
-
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    chrome_options.add_extension(os.path.join(dir_path, extension_path))
+db_config = config.get_database_config()
 
 
 def fetch_existing_relevant_asin(asin):
@@ -49,10 +26,10 @@ def fetch_existing_relevant_asin(asin):
     try:
         # Connect to your database
         conn = psycopg2.connect(
-            dbname="postgres",
-            user="postgres.sxoqzllwkjfluhskqlfl",
-            password="5giE*5Y5Uexi3P2",
-            host="aws-0-us-west-1.pooler.supabase.com",
+            dbname=db_config["dbname"],
+            user=db_config["user"],
+            password=db_config["password"],
+            host=db_config["host"],
         )
         cur = conn.cursor()
         # Execute a query
@@ -76,7 +53,8 @@ def fetch_existing_relevant_asin(asin):
         if conn:
             conn.close()
 
-def scrap_data_smartcount_product(driver, asin):
+
+def scrap_data_smartcount_product(driver, asin, download_dir):
     print("Products")
     wait = WebDriverWait(driver, 30)
     try:
