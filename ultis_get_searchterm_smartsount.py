@@ -28,7 +28,7 @@ def scrap_data_smartcount_relevant_product(driver, asin, download_dir):
     wait = WebDriverWait(driver, 30)
     try:
         print("scroll")
-        element = WebDriverWait(driver, 10).until(
+        element = WebDriverWait(driver, 30).until(
             EC.presence_of_element_located(
                 (By.XPATH, '//*[@id="navSearchTerms"]')
             )  # Replace "element_id" with the actual ID of the element

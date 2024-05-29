@@ -45,7 +45,12 @@ def fetch_existing_relevant_asin(asin):
         asins = cur.fetchall()
         # Convert list of tuples to list
         asins = [item[0] for item in asins]
-        return asins
+        subset_size = 50
+        subsets = [
+            "\n".join(asins[i : i + subset_size])
+            for i in range(0, len(asins), subset_size)
+        ]
+        return "\n".join(asins)
     except Exception as e:
         print(f"Database error: {e}")
         return []
@@ -56,7 +61,7 @@ def fetch_existing_relevant_asin(asin):
 
 def scrap_data_smartcount_product(driver, asin, download_dir):
     print("Products")
-    wait = WebDriverWait(driver, 30)
+    wait = WebDriverWait(driver, 300000)
     try:
         driver.get("https://app.smartscout.com/app/products")
         filter_button = wait.until(
@@ -91,10 +96,10 @@ def scrap_data_smartcount_product(driver, asin, download_dir):
         # Paste text into the textarea
         # Clear the existing text in the textarea
         textarea.clear()
-        text_to_paste = "\n".join(asin)
+
         # Paste the text into the textarea
-        textarea.send_keys(text_to_paste)
-        time.sleep(2)
+        textarea.send_keys(asin)
+        time.sleep(5)
         # Find the button using its attributes
         apply_button = wait.until(
             EC.element_to_be_clickable(
@@ -106,7 +111,7 @@ def scrap_data_smartcount_product(driver, asin, download_dir):
         )
         # Click the button
         apply_button.click()
-
+        time.sleep(5)
         search_button = wait.until(
             EC.element_to_be_clickable((By.XPATH, '//*[@id="btnSearchBrands"]'))
         )
@@ -154,7 +159,7 @@ def scrap_data_smartcount_product(driver, asin, download_dir):
 
         # Click the image
         image.click()
-        time.sleep(10)
+        time.sleep(15)
         print("newest_file")
 
         file_path = download_dir

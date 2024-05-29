@@ -22,9 +22,16 @@ from selenium.common.exceptions import TimeoutException
 import traceback
 from selenium.webdriver.common.action_chains import ActionChains
 from config import config, format_header, get_newest_file
-from ultis_get_product_smartscount import fetch_existing_relevant_asin,scrap_data_smartcount_product
+from ultis_get_product_smartscount import (
+    fetch_existing_relevant_asin,
+    scrap_data_smartcount_product,
+)
 from ultis_get_searchterm_smartsount import scrap_data_smartcount_relevant_product
-from ultis_scrap_helium_cerebro import fetch_asin_tokeyword, captcha_solver, scrap_helium_asin_keyword
+from ultis_scrap_helium_cerebro import (
+    fetch_asin_tokeyword,
+    captcha_solver,
+    scrap_helium_asin_keyword,
+)
 
 # Initialize Supabase client
 supabase = config.supabase
@@ -40,7 +47,7 @@ extension_path, extension_id = config.get_paths_config()
 
 db_config = config.get_database_config()
 
-username,password=config.get_smartscount()
+username, password = config.get_smartscount()
 
 # Create a temporary directory for downloads
 with tempfile.TemporaryDirectory() as download_dir:
@@ -59,6 +66,7 @@ with tempfile.TemporaryDirectory() as download_dir:
 
     dir_path = os.path.dirname(os.path.realpath(__file__))
     chrome_options.add_extension(os.path.join(dir_path, extension_path))
+
 
 def fetch_existing_relevant_asin_main():
     conn = None
@@ -113,16 +121,22 @@ def start_driver(asin):
     # chromedriver_path = os.path.join(dir_path, 'chromedriver.exe')  # Ensure this path is correct
     chrome_service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=chrome_service, options=chrome_options)
+    user_asins = []
     try:
-        smartscouts_next_login(driver, username, password)
-        scrap_data_smartcount_relevant_product(driver, asin,download_dir)
-        time.sleep(5)
-        relevant_asins = fetch_existing_relevant_asin(asin)
-        scrap_data_smartcount_product(driver, relevant_asins,download_dir)
-        captcha_solver(driver,chrome_options)
-        scrap_helium_asin_keyword(driver, fetch_asin_tokeyword(asin),download_dir)
+        user_asins = [
+            asin for asin in user_asins if not fetch_existing_relevant_asin_main()
+        ]
+        if user_asins:
+            smartscouts_next_login(driver, username, password)
+            scrap_data_smartcount_relevant_product(driver, asin, download_dir)
+            time.sleep(5)
+            relevant_asins = fetch_existing_relevant_asin(asin)
+            scrap_data_smartcount_product(driver, relevant_asins, download_dir)
+        captcha_solver(driver, chrome_options)
+        scrap_helium_asin_keyword(driver, fetch_asin_tokeyword(asin), download_dir)
     finally:
         driver.quit()
+
 
 def main(asins):
     with Pool(processes=len(asins)) as pool:
@@ -132,6 +146,4 @@ def main(asins):
 if __name__ == "__main__":
     # Example list of ASINs input by the user
     user_asins = ["B07VPWR7YY"]
-    user_asins = [asin for asin in user_asins if not fetch_existing_relevant_asin(asin)]
-    if user_asins:
-        main(user_asins)
+    main(user_asins)

@@ -107,7 +107,7 @@ def captcha_solver(driver, chrome_options, API="7f97e318653cc85d2d7bc5efdfb1ea9f
             EC.element_to_be_clickable((By.CSS_SELECTOR, "button#client-key-save-btn"))
         )
         save_button.click()
-        time.sleep(2)
+        time.sleep(1)
         # Interact with the radio buttons
         token_radio_button = wait.until(
             EC.element_to_be_clickable((By.CLASS_NAME, "ant-radio-button-wrapper"))
@@ -140,27 +140,44 @@ def scrap_helium_asin_keyword(
         password_field = driver.find_element(By.ID, "loginform-password")
         password_field.send_keys(password)
         status_ready = False
-        while not status_ready:
-            try:
-                status_element = wait.until(
-                    EC.visibility_of_element_located(
-                        (By.CSS_SELECTOR, "div.cm-addon-inner span")
+        status_login = False
+        while not status_login:
+            while not status_ready:
+                try:
+                    status_element = wait.until(
+                        EC.visibility_of_element_located(
+                            (By.CSS_SELECTOR, "div.cm-addon-inner span")
+                        )
                     )
-                )
-                status_text = status_element.text
-                if status_text == "Ready!":
-                    print("Status: Ready")
-                    status_ready = True
-                elif status_text == "In Process...":
-                    print("Status: In Progress")
-                else:
-                    print("Status: Unknown -", status_text)
+                    status_text = status_element.text
+                    if status_text == "Ready!":
+                        print("Status: Ready")
+                        status_ready = True
+                    elif status_text == "In Process...":
+                        print("Status: In Progress")
+                    else:
+                        print("Status: Unknown -", status_text)
+                        time.sleep(1)
+                except:
+                    print("Error checking status")
                     time.sleep(1)
-            except Exception as e:
-                print("Error checking status:", e)
-                time.sleep(1)
-                password_field.send_keys(Keys.RETURN)
-
+                    password_field.send_keys(Keys.RETURN)
+                if status_ready == True:
+                    status_login = True
+                try:
+                    # Wait up to 10 seconds for the element to be present and visible
+                    element = WebDriverWait(driver, 10).until(
+                        EC.visibility_of_element_located(
+                            (
+                                By.XPATH,
+                                "//a[@title='Dashboard' and @href='https://members.helium10.com/?accountId=1544526096']",
+                            )
+                        )
+                    )
+                    print("Element is visible")
+                    status_login = True
+                except:
+                    print("Element not visible")
         password_field.send_keys(Keys.RETURN)
         time.sleep(2)
     except Exception as e:
@@ -170,19 +187,20 @@ def scrap_helium_asin_keyword(
 
     for subset in subsets:
         driver.refresh()
+        time.sleep(5)
         try:
             print("asininput")
             asin_input = WebDriverWait(driver, 30).until(
                 EC.visibility_of_element_located(
                     (
-                        By.CSS_SELECTOR,
-                        'input[placeholder="Enter up to 10 product identifiers for keyword comparison."]',
+                        By.XPATH,
+                        '//*[contains(@placeholder, "Enter up to ") and contains(@placeholder, " product identifiers for keyword comparison")]',
                     )
                 )
             )
             asin_input.clear()
             asin_input.send_keys(subset)
-            time.sleep(2)
+            time.sleep(1)
             asin_input.send_keys(Keys.SPACE)
 
             print("Get Keyword Button")
@@ -193,7 +211,7 @@ def scrap_helium_asin_keyword(
             )
             print("Get Keyword Button_click")
             getkeyword_button.click()
-            time.sleep(2)
+            time.sleep(1)
 
             timeout = 10
             try:
@@ -211,7 +229,7 @@ def scrap_helium_asin_keyword(
             except TimeoutException:
                 print("Popup not found within the timeout period.")
             driver.get_screenshot_as_file("screenshot.png")
-            element = WebDriverWait(driver, 600).until(
+            element = WebDriverWait(driver, 60000).until(
                 EC.presence_of_element_located(
                     (By.XPATH, "//button[@data-testid='export']")
                 )
