@@ -32,6 +32,7 @@ from ultis_scrap_helium_cerebro import (
     captcha_solver,
     scrap_helium_asin_keyword,
 )
+import threading
 
 # Initialize Supabase client
 supabase = config.supabase
@@ -42,7 +43,7 @@ current_time_gmt7 = config.current_time_gmt7
 # Get Selenium configuration
 chrome_options_list = config.get_selenium_config()
 
-# # Path to your extension .crx, extension_id file
+# Path to your extension .crx, extension_id file
 extension_path, extension_id = config.get_paths_config()
 
 db_config = config.get_database_config()
@@ -98,81 +99,6 @@ def fetch_existing_relevant_asin_main():
             conn.close()
 
 
-def get_asin_auto_listing_table():
-    conn = None
-    try:
-        # Connect to your database
-        conn = psycopg2.connect(
-            dbname=db_config["dbname"],
-            user=db_config["user"],
-            password=db_config["password"],
-            host=db_config["host"],
-        )
-        cur = conn.cursor()
-        # Execute a query
-        cur.execute(
-            "SELECT distinct asin FROM auto_listing_table a where a.keyword is null",
-        )
-
-        # Fetch all results
-        asins = cur.fetchall()
-        # Convert list of tuples to list
-        asins = [item[0] for item in asins]
-        return asins
-    except Exception as e:
-        print(f"Database error: {e}")
-        return []
-    finally:
-        if conn:
-            conn.close()
-
-
-def update_keyword_auto_listing():
-    conn = None
-    try:
-        # Connect to your database
-        conn = psycopg2.connect(
-            dbname=db_config["dbname"],
-            user=db_config["user"],
-            password=db_config["password"],
-            host=db_config["host"],
-        )
-        cur = conn.cursor()
-        # Execute a query
-        cur.execute(
-            """-- Step 1: Create a CTE to concatenate keyword phrases grouped by asin_parent
-WITH keyword_phrases AS (
-    SELECT 
-        asin_parent,
-        STRING_AGG(keyword_phrase, ', ') AS concatenated_keywords
-    FROM 
-        reverse_product_lookup_helium
-    GROUP BY 
-        asin_parent
-)
-
--- Step 2: Update the auto_listing_table with the concatenated keyword phrases using LEFT JOIN
-UPDATE 
-    auto_listing_table alt
-SET 
-    keyword = kp.concatenated_keywords
-FROM 
-    keyword_phrases kp
-WHERE 
-    alt.keyword IS NULL
-    AND kp.asin_parent = alt.asin;
-
-"""
-        )
-        # Commit the transaction
-        conn.commit()
-    except Exception as e:
-        print(f"Database error: {e}")
-    finally:
-        if conn:
-            conn.close()
-
-
 def smartscouts_next_login(driver, username=username, password=password):
     driver.get("https://app.smartscout.com/sessions/signin")
     wait = WebDriverWait(driver, 30)
@@ -188,55 +114,48 @@ def smartscouts_next_login(driver, username=username, password=password):
         password_field.send_keys(Keys.RETURN)
         time.sleep(2)
     except Exception as e:
-        # raise Exception
         print("Error during login:", e)
 
 
-def clear_session_and_refresh(driver):
-    driver.delete_all_cookies()
-    driver.execute_script("window.localStorage.clear();")
-    driver.execute_script("window.sessionStorage.clear();")
+def process_asin_in_tab(driver, asin, download_dir):
+    # Open a new tab
+    driver.execute_script("window.open('about:blank', '_blank');")
+    # Get the handle for the new tab
+    new_tab_handle = driver.window_handles[-1]
+    
+    # Create a thread to process the ASIN in the new tab
+    def process_asin():
+        driver.switch_to.window(new_tab_handle)
+        # Login and process the ASIN
+        smartscouts_next_login(driver, username, password)
+        scrap_data_smartcount_relevant_product(driver, asin, download_dir)
+        # Add any additional processing steps if needed
+        print(f"Processed ASIN: {asin}")
+
+    # Start the thread
+    thread = threading.Thread(target=process_asin)
+    thread.start()
+    return thread
 
 
-def start_driver(asin):
-    # chromedriver_path = os.path.join(dir_path, 'chromedriver.exe')  # Ensure this path is correct
+def main(asins):
     chrome_service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=chrome_service, options=chrome_options)
-    user_asins = []
+
     try:
-        while True:
-            user_asins = [
-                asin1 for asin1 in asin if not fetch_existing_relevant_asin_main()
-            ]
-            if user_asins:
-                smartscouts_next_login(driver, username, password)
-                scrap_data_smartcount_relevant_product(driver, asin, download_dir)
-                time.sleep(5)
+        threads = []
 
-            relevant_asins = fetch_existing_relevant_asin(asin)
-            if relevant_asins:
-                scrap_data_smartcount_product(driver, relevant_asins, download_dir)
-            asin_to_keywords = fetch_asin_tokeyword(asin)
-            if asin_to_keywords:
-                captcha_solver(driver, chrome_options)
-                scrap_helium_asin_keyword(
-                    driver, fetch_asin_tokeyword(asin), download_dir
-                )
-            driver.quit()
-            update_keyword_auto_listing()
-            time.sleep(10)
+        for asin in asins:
+            thread = process_asin_in_tab(driver, asin, download_dir)
+            threads.append(thread)
 
+        for thread in threads:
+            thread.join()
     finally:
         driver.quit()
 
 
-def main(asins):
-    with Pool(processes=len(asins)) as pool:
-        pool.map(start_driver, asins)
-
-
 if __name__ == "__main__":
     # Example list of ASINs input by the user
-    user_asins = ["B001SAW1EE"]
-    # get_asin_auto_listing_table()
+    user_asins = ["B001SAW1EE", "B0BT28F6WH"]
     main(user_asins)

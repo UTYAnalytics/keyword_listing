@@ -55,7 +55,7 @@ def fetch_asin_tokeyword(asin):
             ON a.asin = b.asin_relevant AND a.sys_run_date = b.sys_run_date
             WHERE a.sys_run_date = %s AND b.asin = %s 
             AND a.asin not in (select distinct asin_element from split_asins)
-            AND b.relevancy_score > 9
+            AND b.relevancy_score > 8
             ORDER BY a.estimated_monthly_revenue DESC
             LIMIT 10
             """,

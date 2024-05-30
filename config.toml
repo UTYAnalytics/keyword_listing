@@ -16,7 +16,7 @@ offset_hours = 7
 [selenium]
 chrome_options = [
     "--ignore-certificate-errors",
-    "--headless=new",
+    # "--headless=new",
     "--disable-gpu",
     "--no-sandbox",
     "--disable-dev-shm-usage",
